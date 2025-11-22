@@ -1,146 +1,105 @@
 #!/bin/sh
 PATH=/data/adb/ap/bin:/data/adb/ksu/bin:/data/adb/magisk:$PATH
-MODDIR="/data/adb/modules/bindhosts"
-PERSISTENT_DIR="/data/adb/bindhosts"
-. $MODDIR/utils.sh
+MODDIR="/data/adb/modules/adaway_mount_helper"
 SUSFS_BIN="/data/adb/ksu/bin/ksu_susfs"
 
-# always try to prepare hosts file
-if [ ! -f $MODDIR/system/etc/hosts ]; then
-	mkdir -p $MODDIR/system/etc
-	cat /system/etc/hosts > $MODDIR/system/etc/hosts
-	printf "127.0.0.1 localhost\n::1 localhost\n" >> "$MODPATH/system/etc/hosts"
+# Create hosts file directory if needed
+mkdir -p "$MODDIR/system/etc"
+
+# Initialize hosts file if it doesn't exist
+if [ ! -f "$MODDIR/system/etc/hosts" ]; then
+	cat /system/etc/hosts > "$MODDIR/system/etc/hosts" 2>/dev/null || {
+		printf "127.0.0.1 localhost\n::1 localhost\n" > "$MODDIR/system/etc/hosts"
+	}
 fi
-hosts_set_perm "$MODDIR/system/etc/hosts"
 
-# detect operating operating_modes
+# Set proper permissions
+busybox chmod 644 "$MODDIR/system/etc/hosts" 2>/dev/null || chmod 644 "$MODDIR/system/etc/hosts"
+busybox chown root:root "$MODDIR/system/etc/hosts" 2>/dev/null || chown root:root "$MODDIR/system/etc/hosts"
 
-# normal operating_mode
-# all managers? (citation needed) can operate at this operating_mode
-# this assures that we have atleast a base operating operating_mode
+# Detect operating mode for mount strategy
+# Default: normal magic mount
 mode=0
 
-# plain bindhosts operating mode, no hides at all
-# we enable this on apatch overlayfs, APatch litemode, MKSU nomount
-# we now also do this on ksu that supports metamodule
-# while it is basically hideless, this still works.
-if { [ "$APATCH" = "true" ] && [ ! "$APATCH_BIND_MOUNT" = "true" ]; } || 
-	{ [ "$APATCH_BIND_MOUNT" = "true" ] && [ -f /data/adb/.litemode_enable ]; } || 
-	{ [ "$KSU_MAGIC_MOUNT" = "true" ] && [ -f /data/adb/ksu/.nomount ]; } ||
-	{ [ "$KSU" = true ] && [ ! "$KSU_MAGIC_MOUNT" = true ] &&  [ "$KSU_VER_CODE" -ge 22098 ]; }; then
+# Plain mount mode for APatch overlayfs, APatch litemode, KSU nomount
+if { [ "$APATCH" = "true" ] && [ ! "$APATCH_BIND_MOUNT" = "true" ]; } ||
+	{ [ "$APATCH_BIND_MOUNT" = "true" ] && [ -f /data/adb/.litemode_enable ]; } ||
+	{ [ "$KSU_MAGIC_MOUNT" = "true" ] && [ -f /data/adb/ksu/.nomount ]; }; then
 	mode=2
 fi
 
-# ksud kernel umount
-# https://github.com/tiann/KernelSU/commit/4a18921bc00eb83ba3e60bec5672dfbc4d2bd9a2
-if [ "$KSU" = true ] && /data/adb/ksud kernel 2>&1 | grep -q "umount" >/dev/null 2>&1; then
-	echo "bindhosts: post-fs-data.sh - ksud with kernel umount found!" >> /dev/kmsg
-	mode=10
-fi
-
-# we can force mode 2 if user has something that gives unconditional umount to /system/etc/hosts
-# so far NeoZygisk, ReZygisk, NoHello, Zygisk Assistant does it
+# Check for denylist handlers that provide umount capability
 denylist_handlers="rezygisk zygisksu zygisk-assistant zygisk_nohello"
 for module_name in $denylist_handlers; do
-	if [ -d "/data/adb/modules/$module_name" ] && [ ! -f "/data/adb/modules/$module_name/disable" ] && 
+	if [ -d "/data/adb/modules/$module_name" ] && [ ! -f "/data/adb/modules/$module_name/disable" ] &&
 		[ ! -f "/data/adb/modules/$module_name/remove" ]; then
 		if [ "$module_name" = "zygisksu" ]; then
-			if grep -q NeoZygisk /data/adb/modules/zygisksu/module.prop; then
-				module_name="NeoZygisk"
+			if grep -q NeoZygisk /data/adb/modules/zygisksu/module.prop 2>/dev/null; then
+				echo "adaway_mount_helper: NeoZygisk found" >> /dev/kmsg
 			else
-				continue;
+				continue
 			fi
 		fi
-		echo "bindhosts: post-fs-data.sh - $module_name found" >> /dev/kmsg
+		echo "adaway_mount_helper: $module_name found, using plain mount" >> /dev/kmsg
 		mode=2
 	fi
 done
 
-# on ZN 1.3.0 deducing DE / UM status at boot is now possible
-# enforce_denylist:1 is DE
-# enforce_denylist:2 is UM
+# ZygiskNext 1.3.0+ with enforce_denylist
 zygisksu_dir="/data/adb/modules/zygisksu"
 if [ -d "$zygisksu_dir" ] && [ ! -f "$zygisksu_dir/remove" ] && [ ! -f "$zygisksu_dir/disable" ]; then
-	enforce_denylist_mode=$(cat /data/adb/zygisksu/denylist_enforce)
-	if [ "$enforce_denylist_mode" -gt 0 ]; then 
-		echo "bindhosts: post-fs-data.sh - ZygiskNext 1.3.0+ found with enforce_denylist $enforce_denylist_mode" >> /dev/kmsg
-		mode=2
+	if [ -f /data/adb/zygisksu/denylist_enforce ]; then
+		enforce_denylist_mode=$(cat /data/adb/zygisksu/denylist_enforce)
+		if [ "$enforce_denylist_mode" -gt 0 ] 2>/dev/null; then
+			echo "adaway_mount_helper: ZygiskNext with enforce_denylist $enforce_denylist_mode" >> /dev/kmsg
+			mode=2
+		fi
 	fi
 fi
 
-# ksu next 12183
-# ksu next added try_umount /system/etc/hosts recently
-# lets try to add it onto the probe
-if [ "$KSU_NEXT" = "true" ] && [ "$KSU_KERNEL_VER_CODE" -ge 12183 ]; then
+# KSU Next 12183+ with try_umount
+if [ "$KSU_NEXT" = "true" ] && [ "$KSU_KERNEL_VER_CODE" -ge 12183 ] 2>/dev/null; then
 	mode=6
 fi
 
-# ksu+susfs operating_mode
-# handle probing for susfs 1.5.3+
-if [ "$KSU" = true ] && [ -f ${SUSFS_BIN} ] &&
-	${SUSFS_BIN} show enabled_features | grep -q "CONFIG_KSU_SUSFS_TRY_UMOUNT" >/dev/null 2>&1; then
-	echo "bindhosts: post-fs-data.sh - susfs with try_umount found!" >> /dev/kmsg
+# KSU + SUSFS try_umount
+if [ "$KSU" = true ] && [ -f "$SUSFS_BIN" ] &&
+	"$SUSFS_BIN" show enabled_features 2>/dev/null | grep -q "CONFIG_KSU_SUSFS_TRY_UMOUNT"; then
+	echo "adaway_mount_helper: KSU with SUSFS try_umount found" >> /dev/kmsg
 	mode=1
 fi
 
-# hosts_file_redirect operating_mode
-# this method is APatch only
-# no other heuristic other than dmesg
-if [ "$APATCH" = true ]; then
-	dmesg | grep -q "hosts_file_redirect" && {
-	mode=3
-	}
+# KSU source mod with add-try-umount
+if [ "$KSU" = true ] && /data/adb/ksud -h 2>/dev/null | grep -q "add-try-umount"; then
+	echo "adaway_mount_helper: KSU with add-try-umount found" >> /dev/kmsg
+	mode=10001
 fi
 
-# ZN-hostsredirect operating_mode
-# method works for all, requires zn-hostsredirect + zygisk-next
-# while `znctl dump-zn` gives us an idea if znhr is running, 
-# znhr starts at late service when we have to decide what to do NOW.
-# we can only assume that it is on a working state
-# here we unconditionally flag an operating_mode for it
-if [ -d "/data/adb/modules/hostsredirect" ] && [ ! -f "/data/adb/modules/hostsredirect/disable" ] && [ ! -f "/data/adb/modules/hostsredirect/remove" ] &&
+# APatch hosts_file_redirect
+if [ "$APATCH" = true ]; then
+	if dmesg 2>/dev/null | grep -q "hosts_file_redirect"; then
+		mode=3
+	fi
+fi
+
+# ZN-hostsredirect
+if [ -d "/data/adb/modules/hostsredirect" ] && [ ! -f "/data/adb/modules/hostsredirect/disable" ] &&
+	[ ! -f "/data/adb/modules/hostsredirect/remove" ] &&
 	[ -d "$zygisksu_dir" ] && [ ! -f "$zygisksu_dir/disable" ] && [ ! -f "$zygisksu_dir/remove" ]; then
 	mode=4
 fi
 
-# override operating mode here
-[ -f /data/adb/bindhosts/mode_override.sh ] && {
-	echo "bindhosts: post-fs-data.sh - mode_override found!" >> /dev/kmsg
-	. /data/adb/bindhosts/mode_override.sh
-	}
+# Write mode to file for service.sh
+echo "operating_mode=$mode" > "$MODDIR/mode.sh"
 
-# write operating mode to mode.sh 
-# service.sh will read it
-echo "operating_mode=$mode" > $MODDIR/mode.sh
+# Configure skip_mount based on mode
+skip_mount=1
+[ "$mode" = 0 ] && skip_mount=0
 
-# skip_mount logic
-# every mode other than 0 is skip_mount=1
-skip_mount=1 
-[ $mode = 0 ] && skip_mount=0
-
-# we do it like this instead of doing mode=0, mode -ge 1
-# since more modes will likely be added in the future
-# and I will probably be using letters
-[ $skip_mount = 0 ] && ( [ -f $MODDIR/skip_mount ] && rm $MODDIR/skip_mount )
-[ $skip_mount = 1 ] && ( [ ! -f $MODDIR/skip_mount ] && touch $MODDIR/skip_mount )
-
-# disable all other hosts module
-disable_hosts_modules_verbose=2
-disable_hosts_modules
-
-# detect root manager
-# Take note of capitalization when using them!
-# official names are used!
-[ "$APATCH" = true ] && current_manager="APatch"
-[ "$KSU" = true ] && current_manager="KernelSU"
-[ ! "$APATCH" = true ] && [ ! "$KSU" = true ] && current_manager="Magisk"
-[ -f "$PERSISTENT_DIR/root_manager.sh" ] && . "$PERSISTENT_DIR/root_manager.sh"
-# this will likely never happen but just to be sure
-if [ ! "$current_manager" = "$manager" ]; then
-	echo "manager=$current_manager" > "$PERSISTENT_DIR/root_manager.sh"
+if [ "$skip_mount" = 0 ]; then
+	[ -f "$MODDIR/skip_mount" ] && rm "$MODDIR/skip_mount"
+else
+	[ ! -f "$MODDIR/skip_mount" ] && touch "$MODDIR/skip_mount"
 fi
 
-# debugging
-echo "bindhosts: post-fs-data.sh - probing done" >> /dev/kmsg
-
-# EOF
+echo "adaway_mount_helper: mode $mode configured" >> /dev/kmsg

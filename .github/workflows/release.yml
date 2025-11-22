@@ -7,7 +7,6 @@ on:
     paths:
       - '.github/workflows/release.yml'
       - 'module/**'
-      - 'webui/**'
       - 'update.json'
   workflow_dispatch:
     inputs:
@@ -18,7 +17,7 @@ on:
         default: false
 
 env:
-  MODULE_NAME: 'bindhosts'
+  MODULE_NAME: 'adaway_mount_helper'
 
 jobs:
   release:
@@ -29,16 +28,10 @@ jobs:
       with:
         fetch-depth: 2
 
-    - name: build webroot
-      run: |
-        cd webui
-        npm ci
-        npm run build
-
     - name: Set variables
       id: setup
       run: |
-        MODULE_DESC="Systemless hosts for APatch, KernelSU and Magisk."
+        MODULE_DESC="Minimal mount helper for AdAway compatibility with APatch, KernelSU and Magisk."
         CURRENT_VERSION_CODE=$(jq -r .versionCode update.json)
         PREVIOUS_VERSION_CODE=$(jq -r .versionCode <(git show HEAD~1:update.json))
         COMMIT_ID=$(git rev-parse --short HEAD)

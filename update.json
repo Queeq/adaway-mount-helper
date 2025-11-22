@@ -1,6 +1,6 @@
 {
-  "version": "v2.0.8",
-  "versionCode": 208,
-  "zipUrl": "https://github.com/bindhosts/bindhosts/releases/latest/download/bindhosts.zip",
-  "changelog": "https://raw.githubusercontent.com/bindhosts/bindhosts/master/CHANGELOG.md"
+  "version": "v1.0.0",
+  "versionCode": 100,
+  "zipUrl": "https://github.com/Queeq/adaway-mount-helper/releases/latest/download/adaway_mount_helper.zip",
+  "changelog": "https://raw.githubusercontent.com/Queeq/adaway-mount-helper/master/CHANGELOG.md"
 }

@@ -1,45 +1,41 @@
-[English](README.md) | [Deutsch](README_de.md) | [Español](README_es-ES.md) | [Français](README_fr.md) | [Bahasa Indonesia](README_id.md) | [Italiano](README_it.md) | [Русский](README_ru.md) | [Türkçe](README_tr.md) | [简体中文](README_zh-CN.md) 
+# AdAway Mount Helper
 
-# bindhosts
+Minimal systemless hosts mount helper for APatch, KernelSU and Magisk.
 
-Systemless hosts for APatch, KernelSU and Magisk
+## About
 
-Fully standalone, self-updating.
+This module is inspired by [bindhosts](https://github.com/bindhosts/bindhosts) but stripped down to only the essential mount functionality needed to enable [AdAway](https://github.com/AdAway/AdAway) to work with modern root managers.
 
-## Features
-
+**What was removed:**
 - WebUI and action button control
-- Adaway coexistence 
-- Systemless hosts via manager mount, bind mount, and OverlayFS
-- Redirect methods: ZN-hostsredirect, hosts_file_redirect, open_redirect
+- Built-in ad-blocking engine
+- Automatic hosts list updates
+- Multiple redirect methods (kept only essential mount modes)
+- Cron scheduling
+- Translation files and multi-language support
+
+**What remains:**
+- Operating mode detection for various root managers
+- Proper mount strategy selection
+- AdAway compatibility layer
+- Support for SUSFS, ZygiskNext, and other denylist handlers
+
+## Purpose
+
+This module does **not** block ads by itself. It simply prepares the mount infrastructure so that AdAway can manage the hosts file properly across different root managers and configurations.
 
 ## Supported Root Managers
 
 - [APatch](https://github.com/bmax121/APatch)
 - [KernelSU](https://github.com/tiann/KernelSU)
-- [Magisk](https://github.com/topjohnwu/Magisk)  <sup>([no WebUI](https://github.com/topjohnwu/Magisk/issues/8609#event-15568590949)👀)</sup>
+- [Magisk](https://github.com/topjohnwu/Magisk)
 
-### Also Supported on
+## Installation
 
-- [KsuWebUI](https://github.com/5ec1cff/KsuWebUIStandalone)   <sup>🌐</sup>
-- [WebUI-X](https://github.com/MMRLApp/WebUI-X-Portable)   <sup>🌐</sup>
-- [MMRL](https://github.com/MMRLApp/MMRL)
+1. Install this module through your root manager
+2. Install [AdAway](https://github.com/AdAway/AdAway)
+3. AdAway will automatically detect and use the prepared mount point
 
-## Resources
+## Credits
 
-- [FAQ](Documentation/faq.md)
-- [Usage](Documentation/usage.md)
-- [Hiding](Documentation/hiding.md)
-- [Operating Modes](Documentation/modes.md)
-
-## Links
-
-- Download [here](https://github.com/bindhosts/bindhosts/releases)
-- Looking for more sources? [here](Documentation/sources.md)
-- Localization [guide](Documentation/localize.md)
-
-## Help and Support
-
-Report [here](https://github.com/bindhosts/bindhosts/issues) if you encounter any issues.
-
-[Pull requests](https://github.com/bindhosts/bindhosts/pulls) are always welcome.
+Based on the excellent work by the [bindhosts project](https://github.com/bindhosts/bindhosts).

@@ -1,7 +1,7 @@
-id=bindhosts
-name=bindhosts
-version=v2.0.8
-versionCode=208
-author=xx, KOWX712
-updateJson=https://raw.githubusercontent.com/bindhosts/bindhosts/master/update.json
-description=Systemless hosts for APatch, KernelSU and Magisk 
+id=adaway_mount_helper
+name=AdAway Mount Helper
+version=v1.0.0
+versionCode=100
+author=Extracted from bindhosts
+description=Minimal mount helper for AdAway compatibility with KernelSU/APatch
+updateJson=https://raw.githubusercontent.com/Queeq/adaway-mount-helper/master/update.json
